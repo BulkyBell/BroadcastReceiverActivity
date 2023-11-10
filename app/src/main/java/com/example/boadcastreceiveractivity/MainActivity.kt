@@ -1,55 +1,64 @@
+
 package com.example.boadcastreceiveractivity
 
-import android.content.Intent
-import android.content.IntentFilter
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
-import android.widget.TextView
+import android.provider.CallLog
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
-    private val receptor = Receptor()
-
     companion object {
-        const val ACTION_TEXTO_BATERIA = "com.example.boadcastreceiveractivity.ACTION_TEXTO_BATERIA"
+        const val REQUEST_CODE_PERMISSION = 123
+        const val TAG = "LLAMADAS"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val filter = IntentFilter()
-        filter.addAction(Intent.ACTION_BATTERY_LOW)
-        filter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
-        filter.addAction(ACTION_TEXTO_BATERIA)
-
-        val textoBateria: TextView = findViewById(R.id.controlBateria)
-
-        registerReceiver(receptor, filter)
-        actualizarTextoBateria(textoBateria, receptor.modoAvion, receptor.bateriaBaja)
-
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        unregisterReceiver(receptor)
-    }
-
-    private fun actualizarTextoBateria(
-        textoBateria: TextView,
-        modoAvion: Boolean,
-        bateriaBaja: Boolean
-    ) {
-        runOnUiThread {
-            val mensaje = buildString {
-                if (modoAvion) append("Modo Avión Activado\n")
-                if (bateriaBaja) append("Batería Baja")
-            }
-
-            if (mensaje.isNotEmpty()) {
-                textoBateria.setText(mensaje)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.READ_CALL_LOG
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.READ_CALL_LOG),
+                    REQUEST_CODE_PERMISSION
+                )
             } else {
-                textoBateria.setText("Control de Batería")
+                displayCallLog()
+            }
+        } else {
+            displayCallLog()
+        }
+    }
+
+    private fun displayCallLog() {
+        val cursor = contentResolver.query(
+            CallLog.Calls.CONTENT_URI,
+            null,
+            null,
+            null,
+            "${CallLog.Calls.DATE} DESC"
+        )
+
+        cursor?.use {
+            val numberIndex = it.getColumnIndex(CallLog.Calls.NUMBER)
+            val dateIndex = it.getColumnIndex(CallLog.Calls.DATE)
+
+            while (it.moveToNext()) {
+                val number = it.getString(numberIndex)
+                val date = it.getString(dateIndex)
+
+                Log.d(TAG, "Number: $number, Date: $date")
             }
         }
     }
